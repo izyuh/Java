@@ -10,7 +10,6 @@ public class Bank {
     static Map<String, Account> accounts = new HashMap<>();
 
     public static void main(String[] args) {
-        accounts.put("admin", new Account(hashPassword("admin123"), 1000.0)); //// TEST ACCOUNT
 
         loadAccounts();
         homepage();
@@ -91,17 +90,17 @@ public class Bank {
 
         System.out.println("Please enter your password");
         String password = scanner.nextLine();
-        String hashedPassword = hashPassword(password);
 
-        if (accounts.containsKey(username) && accounts.get(username).getHashedPassword().equals(hashedPassword)) {
-            System.out.println("Logging in...");
-            try {
-                Thread.sleep(1000); // Simulate a delay for login processing
-            } catch (InterruptedException e) {
+        // if there is an account with said username
+        if (accounts.containsKey(username)) {
+            String salt = accounts.get(username).getSalt();  //get salt for that user
+            String hasedPassword = hashPassword(password, salt); // hash user input with salf of attempted user
+
+            if(accounts.get(username).getHashedPassword().equals(accounts.get(username).getHashedPassword())) { //if attempted password mathches stored password then sign in
+                System.out.println("Login successful. Welcome " + username + "!");
+                runUserSession(username);
+                return username;
             }
-            System.out.println("Login successful as **" + username + "**\n");
-            runUserSession(username);
-            return username;
         } else {
             System.out.println(
                     "Login failed. Username or Password is incorrect.\n Try Again or press 1 to create an account.\n");
@@ -111,11 +110,12 @@ public class Bank {
                 handleLogin();
             }
 
-            return null;
         }
+        return null;
     }
 
     private static void handleAccountCreation() {
+        String salt = generateSalt();
         System.out.println("Please enter your desired username");
         Scanner scanner = new Scanner(System.in);
         String username = scanner.nextLine();
@@ -131,9 +131,10 @@ public class Bank {
         System.out.println("Please confirm your password");
         String confirmedPassword = scanner.nextLine();
         if (password.equals(confirmedPassword)) {
-            String hashedPassword = hashPassword(password);
+            String hashedPassword = hashPassword(password, salt);
 
-            accounts.put(username, new Account(hashedPassword, 0.0));
+            accounts.put(username, new Account(hashedPassword, 0.0, salt));
+            saveAccountsToFile();
             System.out.println("Account created successfully for " + username + "");
         } else {
             System.out.println("Passwords do not match. Account creation failed. Please try again.");
@@ -145,14 +146,22 @@ public class Bank {
 
     }
 
-    private static String hashPassword(String password) {
+    private static String hashPassword(String password, String salt) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashBytes = digest.digest(password.getBytes(StandardCharsets.UTF_8));
+            String saltedPassword = password + salt;
+            byte[] hashBytes = digest.digest(saltedPassword.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hashBytes);
         } catch (Exception e) {
             throw new RuntimeException("Error hashing password", e);
         }
+    }
+
+    private static String generateSalt() {
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        byte[] salt = new byte[16];
+        random.nextBytes(salt);
+        return HexFormat.of().formatHex(salt);
     }
 
     private static void saveAccountsToFile() {
@@ -160,7 +169,7 @@ public class Bank {
             for (Map.Entry<String, Account> entry : accounts.entrySet()) {
                 String username = entry.getKey();
                 Account acc = entry.getValue();
-                writer.println(username + "," + acc.getHashedPassword() + "," + acc.getBalance());
+                writer.println(username + "," + acc.getHashedPassword() + "," + acc.getBalance() + "," + acc.getSalt());
             }
         } catch (Exception e) {
             System.out.println("Error saving accounts: " + e.getMessage());
@@ -213,11 +222,12 @@ public class Bank {
         try (java.util.Scanner fileScanner = new java.util.Scanner(file)) {
             String line = fileScanner.nextLine();
             String[] parts = line.split(",");
-            if (parts.length == 3) {
+            if (parts.length == 4) {
                 String username = parts[0];
                 String hashedPassword = parts[1];
                 double balance = Double.parseDouble(parts[2]);
-                accounts.put(username, new Account(hashedPassword, balance));
+                String salt = parts[3];
+                accounts.put(username, new Account(hashedPassword, balance, salt));
             }
         } catch (Exception e) {
             System.out.println("Error loading accounts: " + e.getMessage());

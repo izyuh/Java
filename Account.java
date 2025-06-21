@@ -2,20 +2,20 @@ import java.util.Scanner;
 
 public class Account {
     private String hashedPassword;
+    private String salt;
     private double balance;
 
-    public Account(String hashedPassword, double balance) {
+    public Account(String hashedPassword, double balance, String salt) {
+        this.salt = salt;
         this.hashedPassword = hashedPassword;
         this.balance = balance;
     }
 
-    public String getHashedPassword() {
-        return hashedPassword;
-    }
+    public String getSalt() {return salt;}
 
-    public double getBalance() {
-        return balance;
-    }
+    public String getHashedPassword() {return hashedPassword;}
+
+    public double getBalance() {return balance;}
 
     public void addBalance(double amount) {
         if (amount > 0) {
